@@ -1,7 +1,6 @@
-// Service Worker for TeleMed PWA
-const CACHE_NAME = 'telemed-v1.0.0'
-const STATIC_CACHE_NAME = 'telemed-static-v1.0.0'
-const DYNAMIC_CACHE_NAME = 'telemed-dynamic-v1.0.0'
+const CACHE_NAME = 'telemed-v1.0.0';
+const STATIC_CACHE_NAME = 'telemed-static-v1.0.0';
+const DYNAMIC_CACHE_NAME = 'telemed-dynamic-v1.0.0';
 
 // Files to cache immediately
 const STATIC_ASSETS = [
@@ -10,8 +9,7 @@ const STATIC_ASSETS = [
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
   '/call-sound.mp3',
-  // Add other critical assets
-]
+];
 
 // API endpoints to cache
 const API_CACHE_PATTERNS = [
@@ -19,260 +17,184 @@ const API_CACHE_PATTERNS = [
   /^\/api\/appointments$/,
   /^\/api\/notifications/,
   /^\/api\/users\/doctors/
-]
+];
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installing...')
-  
+  console.log('Service Worker: Installing...');
+
   event.waitUntil(
     caches.open(STATIC_CACHE_NAME)
-      .then((cache) => {
-        console.log('Service Worker: Caching static assets')
-        return cache.addAll(STATIC_ASSETS)
-      })
-      .then(() => {
-        console.log('Service Worker: Static assets cached')
-        return self.skipWaiting()
-      })
-      .catch((error) => {
-        console.error('Service Worker: Failed to cache static assets', error)
-      })
-  )
-})
+      .then(cache => cache.addAll(STATIC_ASSETS))
+      .then(() => self.skipWaiting())
+      .catch(err => console.error('Service Worker: Static caching failed', err))
+  );
+});
 
-// Activate event - clean up old caches
+// Activate event - remove old caches
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activating...')
-  
+  console.log('Service Worker: Activating...');
   event.waitUntil(
     caches.keys()
-      .then((cacheNames) => {
-        return Promise.all(
-          cacheNames.map((cacheName) => {
-            if (cacheName !== STATIC_CACHE_NAME && 
-                cacheName !== DYNAMIC_CACHE_NAME &&
-                cacheName !== CACHE_NAME) {
-              console.log('Service Worker: Deleting old cache', cacheName)
-              return caches.delete(cacheName)
-            }
-          })
-        )
-      })
-      .then(() => {
-        console.log('Service Worker: Activated')
-        return self.clients.claim()
-      })
-  )
-})
+      .then(keys => Promise.all(
+        keys.map(key => {
+          if (![CACHE_NAME, STATIC_CACHE_NAME, DYNAMIC_CACHE_NAME].includes(key)) {
+            console.log('Service Worker: Deleting old cache', key);
+            return caches.delete(key);
+          }
+        })
+      ))
+      .then(() => self.clients.claim())
+  );
+});
 
-// Fetch event - handle requests
+// Fetch handler
 self.addEventListener('fetch', (event) => {
-  const { request } = event
-  const url = new URL(request.url)
+  const { request } = event;
+  const url = new URL(request.url);
 
-  // Skip non-GET requests
-  if (request.method !== 'GET') {
-    return
-  }
+  // Only handle http(s) GET requests
+  if (request.method !== 'GET' || !request.url.startsWith('http')) return;
 
-  // Skip chrome-extension and other non-http requests
-  if (!request.url.startsWith('http')) {
-    return
-  }
-
-  // Handle API requests
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(handleApiRequest(request))
-    return
+    event.respondWith(handleApiRequest(request));
+  } else {
+    event.respondWith(handleStaticRequest(request));
   }
+});
 
-  // Handle static assets and pages
-  event.respondWith(handleStaticRequest(request))
-})
-
-// Handle API requests with network-first strategy
+// API cache strategy: Network-first
 async function handleApiRequest(request) {
-  const url = new URL(request.url)
-  
+  const url = new URL(request.url);
+
   try {
-    // Try network first
-    const networkResponse = await fetch(request)
-    
-    // Cache successful responses for specific endpoints
-    if (networkResponse.ok && shouldCacheApiResponse(url.pathname)) {
-      const cache = await caches.open(DYNAMIC_CACHE_NAME)
-      cache.put(request, networkResponse.clone())
+    const response = await fetch(request);
+
+    // Skip caching partial responses (206)
+    if (response.status === 206) return response;
+
+    if (response.ok && shouldCacheApiResponse(url.pathname)) {
+      const cache = await caches.open(DYNAMIC_CACHE_NAME);
+      cache.put(request, response.clone());
     }
-    
-    return networkResponse
+
+    return response;
   } catch (error) {
-    console.log('Service Worker: Network failed, trying cache for API request')
-    
-    // Try cache if network fails
-    const cachedResponse = await caches.match(request)
-    if (cachedResponse) {
-      return cachedResponse
-    }
-    
-    // Return offline response for critical endpoints
+    console.warn('Service Worker: Network error, trying cache', request.url);
+
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) return cachedResponse;
+
     if (shouldReturnOfflineResponse(url.pathname)) {
       return new Response(
         JSON.stringify({
           error: 'Offline',
-          message: 'You are currently offline. Some features may not be available.',
-          cached: true
+          message: 'You are currently offline. Some features may be limited.',
+          cached: false
         }),
         {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         }
-      )
+      );
     }
-    
-    throw error
+
+    return new Response('Network error occurred', { status: 500 });
   }
 }
 
-// Handle static requests with cache-first strategy
+// Static asset strategy: Cache-first
 async function handleStaticRequest(request) {
   try {
-    // Try cache first
-    const cachedResponse = await caches.match(request)
-    if (cachedResponse) {
-      return cachedResponse
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) return cachedResponse;
+
+    const response = await fetch(request);
+
+    // Skip caching partial responses (206)
+    if (response.status === 206) return response;
+
+    if (response.ok) {
+      const cache = await caches.open(DYNAMIC_CACHE_NAME);
+      cache.put(request, response.clone());
     }
-    
-    // Try network
-    const networkResponse = await fetch(request)
-    
-    // Cache successful responses
-    if (networkResponse.ok) {
-      const cache = await caches.open(DYNAMIC_CACHE_NAME)
-      cache.put(request, networkResponse.clone())
-    }
-    
-    return networkResponse
+
+    return response;
   } catch (error) {
-    console.log('Service Worker: Failed to fetch', request.url)
-    
-    // Return offline page for navigation requests
+    console.warn('Service Worker: Static fetch failed', request.url);
+
     if (request.mode === 'navigate') {
-      const offlineResponse = await caches.match('/')
-      if (offlineResponse) {
-        return offlineResponse
-      }
+      const offlineFallback = await caches.match('/');
+      return offlineFallback || new Response('Offline', { status: 503 });
     }
-    
-    throw error
+
+    return new Response('Static resource error', { status: 500 });
   }
 }
 
-// Check if API response should be cached
+// Determine if API should be cached
 function shouldCacheApiResponse(pathname) {
-  return API_CACHE_PATTERNS.some(pattern => pattern.test(pathname))
+  return API_CACHE_PATTERNS.some(pattern => pattern.test(pathname));
 }
 
-// Check if offline response should be returned
+// Offline fallback for key API endpoints
 function shouldReturnOfflineResponse(pathname) {
   const offlineEndpoints = [
     '/api/users/profile',
     '/api/appointments',
     '/api/notifications'
-  ]
-  return offlineEndpoints.some(endpoint => pathname.startsWith(endpoint))
+  ];
+  return offlineEndpoints.some(endpoint => pathname.startsWith(endpoint));
 }
 
-// Handle background sync
+// Background Sync Handler
 self.addEventListener('sync', (event) => {
-  console.log('Service Worker: Background sync triggered', event.tag)
-  
   if (event.tag === 'background-sync') {
-    event.waitUntil(doBackgroundSync())
+    console.log('Service Worker: Background sync triggered');
+    event.waitUntil(doBackgroundSync());
   }
-})
+});
 
-// Background sync function
 async function doBackgroundSync() {
-  try {
-    // Sync offline actions when back online
-    console.log('Service Worker: Performing background sync')
-    
-    // You can implement offline queue sync here
-    // For example, sync offline messages, appointment updates, etc.
-    
-  } catch (error) {
-    console.error('Service Worker: Background sync failed', error)
-  }
+  console.log('Service Worker: Executing background sync...');
+  // Implement queued sync logic here
 }
 
-// Handle push notifications
+// Push Notification Handler
 self.addEventListener('push', (event) => {
-  console.log('Service Worker: Push notification received')
-  
+  const data = event.data?.json() || {};
   const options = {
-    body: 'You have a new notification from TeleMed',
+    body: data.body || 'You have a new notification from TeleMed',
     icon: '/icons/icon-192x192.png',
     badge: '/icons/badge-72x72.png',
     vibrate: [100, 50, 100],
-    data: {
-      dateOfArrival: Date.now(),
-      primaryKey: 1
-    },
+    data: { primaryKey: 1, dateOfArrival: Date.now() },
     actions: [
-      {
-        action: 'explore',
-        title: 'View',
-        icon: '/icons/checkmark.png'
-      },
-      {
-        action: 'close',
-        title: 'Close',
-        icon: '/icons/xmark.png'
-      }
+      { action: 'explore', title: 'View', icon: '/icons/checkmark.png' },
+      { action: 'close', title: 'Dismiss', icon: '/icons/xmark.png' }
     ]
-  }
-  
-  if (event.data) {
-    const data = event.data.json()
-    options.body = data.body || options.body
-    options.title = data.title || 'TeleMed'
-  }
-  
+  };
+
   event.waitUntil(
-    self.registration.showNotification('TeleMed', options)
-  )
-})
+    self.registration.showNotification(data.title || 'TeleMed', options)
+  );
+});
 
-// Handle notification clicks
+// Notification Click Handler
 self.addEventListener('notificationclick', (event) => {
-  console.log('Service Worker: Notification clicked')
-  
-  event.notification.close()
-  
+  event.notification.close();
   if (event.action === 'explore') {
-    event.waitUntil(
-      clients.openWindow('/notifications')
-    )
-  } else if (event.action === 'close') {
-    // Just close the notification
+    event.waitUntil(clients.openWindow('/notifications'));
   } else {
-    // Default action - open the app
-    event.waitUntil(
-      clients.openWindow('/')
-    )
+    event.waitUntil(clients.openWindow('/'));
   }
-})
+});
 
-// Handle message from main thread
+// Message Listener (for SKIP_WAITING and GET_VERSION)
 self.addEventListener('message', (event) => {
-  console.log('Service Worker: Message received', event.data)
-  
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting()
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  } else if (event.data?.type === 'GET_VERSION') {
+    event.ports[0].postMessage({ version: CACHE_NAME });
   }
-  
-  if (event.data && event.data.type === 'GET_VERSION') {
-    event.ports[0].postMessage({ version: CACHE_NAME })
-  }
-})
+});
