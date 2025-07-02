@@ -14,7 +14,7 @@ export const useAuth = () => {
 
 // Configure axios defaults with production-ready URL handling
 const API_BASE_URL = import.meta.env.VITE_API_URL || (
-  import.meta.env.DEV ? 'http://localhost:5000' : 'https://telemedicine-v1.vercel.app'
+  import.meta.env.DEV ? 'http://localhost:5000' : 'https://telemedicine-backend-v1.vercel.app'
 )
 
 axios.defaults.baseURL = API_BASE_URL

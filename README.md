@@ -72,10 +72,14 @@ A comprehensive full-stack telemedicine application that enables secure online c
    
    Update the `.env` file with your configuration:
    ```env
+   # Frontend Environment Variables
+   VITE_API_URL=https://telemedicine-backend-v1.vercel.app
+   
+   # Backend Environment Variables (for backend deployment)
    PORT=5000
-   MONGODB_URI=mongodb://localhost:27017/telemedicine
+   MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/telemedicine
    JWT_SECRET=your-super-secret-jwt-key-here
-   CLIENT_URL=http://localhost:5174
+   CLIENT_URL=https://telemedicine-v1.vercel.app
    ```
 
 4. **Start MongoDB**
@@ -87,6 +91,53 @@ A comprehensive full-stack telemedicine application that enables secure online c
    ```
 
    This will start both the frontend (port 5174) and backend (port 5000) concurrently.
+
+## 🚀 Deployment
+
+### Frontend Deployment (Vercel)
+
+1. **Deploy to Vercel**
+   ```bash
+   # Install Vercel CLI
+   npm i -g vercel
+   
+   # Deploy
+   vercel --prod
+   ```
+
+2. **Environment Variables**
+   Set the following environment variable in Vercel dashboard:
+   ```
+   VITE_API_URL=https://your-backend-url.vercel.app
+   ```
+
+### Backend Deployment (Separate Repository)
+
+The backend needs to be deployed separately. Create a new repository with just the `server/` folder and deploy it to Vercel or another platform.
+
+1. **Create a new repository for backend**
+2. **Copy the `server/` folder contents to the root**
+3. **Create a `package.json` for the backend**
+4. **Deploy to Vercel with these settings:**
+   - Build Command: `npm install`
+   - Output Directory: `.`
+   - Install Command: `npm install`
+
+### Environment Variables for Backend Deployment
+
+Set these in your backend deployment platform:
+
+```env
+PORT=5000
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/telemedicine
+JWT_SECRET=your-super-secret-jwt-key-here
+CLIENT_URL=https://telemedicine-v1.vercel.app
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-app-password
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+```
 
 ## 🏗️ Project Structure
 
@@ -169,26 +220,6 @@ telemedicine-portal/
 - `GET /api/chat/appointment/:id` - Get appointment messages
 - `PUT /api/chat/appointment/:id/read` - Mark messages as read
 
-## 🚀 Deployment
-
-### Environment Setup
-1. Set up production MongoDB instance
-2. Configure environment variables for production
-3. Set up SSL certificates for HTTPS
-4. Configure email service for notifications
-
-### Build Process
-```bash
-npm run build
-```
-
-### Production Considerations
-- Use PM2 for process management
-- Set up reverse proxy with Nginx
-- Configure CORS for production domains
-- Enable MongoDB authentication
-- Set up monitoring and logging
-
 ## 🔒 Security Measures
 
 - **Data Encryption**: All sensitive data encrypted in transit and at rest
@@ -253,3 +284,37 @@ For support and questions:
 ---
 
 **Note**: This is a demonstration project. For production use, ensure proper security audits, compliance with healthcare regulations (HIPAA, GDPR), and thorough testing.
+
+## 🚨 Important Deployment Notes
+
+### Separate Backend Deployment Required
+
+This project requires the backend to be deployed separately from the frontend. The current setup assumes:
+
+1. **Frontend**: Deployed on Vercel at `https://telemedicine-v1.vercel.app`
+2. **Backend**: Needs to be deployed separately at `https://telemedicine-backend-v1.vercel.app`
+
+### Steps to Deploy Backend Separately:
+
+1. Create a new repository for the backend
+2. Copy the `server/` folder contents to the root of the new repository
+3. Create a `package.json` file in the root with backend dependencies
+4. Deploy to Vercel or another platform
+5. Update the `VITE_API_URL` environment variable in your frontend deployment
+
+### Environment Variables Setup:
+
+**Frontend (.env):**
+```env
+VITE_API_URL=https://your-backend-deployment-url.vercel.app
+```
+
+**Backend (.env):**
+```env
+PORT=5000
+MONGODB_URI=your-mongodb-connection-string
+JWT_SECRET=your-jwt-secret
+CLIENT_URL=https://telemedicine-v1.vercel.app
+```
+
+Without the backend deployment, the frontend will not be able to connect to any API endpoints, resulting in the connection errors you're experiencing.
