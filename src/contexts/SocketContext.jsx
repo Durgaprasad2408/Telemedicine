@@ -24,7 +24,7 @@ export const SocketProvider = ({ children }) => {
       if (token) {
         // Use environment variable for Socket.io connection
         const socketUrl = import.meta.env.VITE_API_URL || (
-          import.meta.env.DEV ? 'http://localhost:5000' : 'https://telemedicine-backend-v1.vercel.app'
+          import.meta.env.DEV ? 'http://localhost:5000' : 'https://telemed.up.railway.app'
         )
         
         const newSocket = io(socketUrl, {

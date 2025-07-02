@@ -73,7 +73,7 @@ A comprehensive full-stack telemedicine application that enables secure online c
    Update the `.env` file with your configuration:
    ```env
    # Frontend Environment Variables
-   VITE_API_URL=https://telemedicine-backend-v1.vercel.app
+   VITE_API_URL=https://telemed.up.railway.app
    
    # Backend Environment Variables (for backend deployment)
    PORT=5000
@@ -292,7 +292,7 @@ For support and questions:
 This project requires the backend to be deployed separately from the frontend. The current setup assumes:
 
 1. **Frontend**: Deployed on Vercel at `https://telemedicine-v1.vercel.app`
-2. **Backend**: Needs to be deployed separately at `https://telemedicine-backend-v1.vercel.app`
+2. **Backend**: Needs to be deployed separately at `https://telemed.up.railway.app`
 
 ### Steps to Deploy Backend Separately:
 
